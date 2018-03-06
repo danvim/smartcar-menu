@@ -1,0 +1,10 @@
+.idea/
+bin/
+.settings/
+cmake-build-debug/
+obj/
+inc/ui
+src/ui
+.cproject
+.project
+codealike.json
