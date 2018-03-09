@@ -17,12 +17,12 @@ public:
         float D = 0;
     };
 
-    void save();
-    void load();
+    static void save();
+    static void load();
 
 
-    Data data{};
-    libbase::k60::Flash* flash_ptr = nullptr;
+    static Data data;
+    static libbase::k60::Flash* flash_ptr;
 };
 
 

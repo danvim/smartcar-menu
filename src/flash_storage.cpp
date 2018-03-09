@@ -4,13 +4,17 @@
 
 #include "flash_storage.h"
 
+FlashStorage::Data FlashStorage::data{};
+libbase::k60::Flash* FlashStorage::flash_ptr = nullptr;
+
 void FlashStorage::save() {
-    auto *buff = reinterpret_cast<Byte*>(&data);
-    flash_ptr->Write(buff, sizeof(Data));
+    Byte bytes[sizeof(Data)];
+    memcpy(bytes, &data, sizeof(Data));
+    flash_ptr->Write(bytes, sizeof(Data));
 }
 
 void FlashStorage::load() {
-    auto *buff = new Byte[sizeof(Data)];
-    flash_ptr->Read(buff, sizeof(Data));
-    memcpy(&data, buff, sizeof(Data));
+    Byte bytes[sizeof(Data)];
+    flash_ptr->Read(bytes, sizeof(Data));
+    memcpy(&data, bytes, sizeof(Data));
 }
