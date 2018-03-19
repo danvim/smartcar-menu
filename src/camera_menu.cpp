@@ -48,12 +48,13 @@ void CameraMenu::run() {
     // Initialize other components
     //
 
-    auto* flash = new libbase::k60::Flash([](){
-        libbase::k60::Flash::Config config{};
-        return config;
-    }());
+    if (FlashStorage::flash_ptr == nullptr) {
+        FlashStorage::flash_ptr = new libbase::k60::Flash([]() {
+            libbase::k60::Flash::Config config{};
+            return config;
+        }());
+    }
 
-    FlashStorage::flash_ptr = flash;
     FlashStorage::load();
 
 
@@ -265,4 +266,6 @@ void CameraMenu::run() {
 
     ui::Context::removeFontFromRepo("Humanist");
     ui::Context::removeFontFromRepo("Blocky");
+
+    delete servo_ptr;
 }
