@@ -5,6 +5,10 @@
 #include "camera_menu.h"
 
 void CameraMenu::run() {
+    //
+    // Prepare UI
+    //
+
     ui::fonts::Humanist humanist;
     ui::fonts::Blocky blocky;
 
@@ -39,19 +43,31 @@ void CameraMenu::run() {
         return color_scheme;
     }());
 
-    //Initialize components
+
+    //
+    // Initialize other components
+    //
+
     auto* flash = new libbase::k60::Flash([](){
         libbase::k60::Flash::Config config{};
         return config;
     }());
 
-
-
     FlashStorage::flash_ptr = flash;
     FlashStorage::load();
 
+
+    //
+    // Initialize Menu Group
+    //
+
     ui::MenuGroup menu_group("Startup Menu");
     menu_group.setHasBackArrow(false);
+
+
+    //
+    // Declare and initialize various Menu Items to be added to menu_group.
+    //
 
     class ConfigFlashFloat: public ui::MenuNumber<float> {
     public:
@@ -59,6 +75,11 @@ void CameraMenu::run() {
                 data_ptr(data_ptr) {}
 
         void onEnter() override {
+            /**
+             * Remember to set the data pointer to point to a member in the FlashStorage struct.
+             * @see FlashStorage::data
+             */
+            assert(data_ptr != nullptr);
             this->setValue(*data_ptr);
         }
 
@@ -69,21 +90,8 @@ void CameraMenu::run() {
         }
 
     private:
-        float* data_ptr;
+        float* data_ptr = nullptr;
 
-    };
-
-    class ResetFlashAction: public ui::MenuAction {
-    public:
-
-        int run() override {
-            FlashStorage::Data data{};
-            FlashStorage::data = data;
-            //save to flash
-            FlashStorage::save();
-
-            return SUCCESS;
-        }
     };
 
     ConfigFlashFloat config_p(&FlashStorage::data.P);
@@ -95,6 +103,19 @@ void CameraMenu::run() {
     ConfigFlashFloat config_d(&FlashStorage::data.D);
     config_d.setName("Set D-Value");
     config_d.setStep(0.1f);
+
+    class ResetFlashAction: public ui::MenuAction {
+    public:
+
+        int run() override {
+            // Resets FlashStorage::data to its default values declared in the header file.
+            FlashStorage::data = FlashStorage::Data{};
+            FlashStorage::save();
+
+            return SUCCESS;
+        }
+    };
+
     ResetFlashAction reset_flash_action;
     reset_flash_action.setName("Reset Flash");
 
@@ -130,9 +151,12 @@ void CameraMenu::run() {
             toolbar.setRegion(0, 0, 128, 16);
             toolbar.render();
 
+            const int image_w = 80;
+            const int image_h = 60;
+
             //Render loop
             Timer::TimerInt time = System::Time();
-            libsc::Lcd::Rect image_region = libsc::Lcd::Rect(0, 18, 128, 96);
+            libsc::Lcd::Rect image_region = libsc::Lcd::Rect(0, 18, image_w, image_h);
 
             bool is_exit = false;
 
@@ -146,8 +170,8 @@ void CameraMenu::run() {
 
             libsc::k60::Ov7725::Config camera_config;
             camera_config.id = 0;
-            camera_config.w = 128;
-            camera_config.h = 96;
+            camera_config.w = image_w;
+            camera_config.h = image_h;
             camera_config.fps = libsc::k60::Ov7725Configurator::Config::Fps::kHigh;
             libsc::k60::Ov7725 camera(camera_config);
             camera.Start();
@@ -164,7 +188,7 @@ void CameraMenu::run() {
                         ui::Context::lcd_ptr->FillBits(ui::Context::color_scheme.BLACK, ui::Context::color_scheme.WHITE, buffer, buffer_size*8);
                         camera.UnlockBuffer();
 
-                        ui::Context::lcd_ptr->SetRegion(libsc::Lcd::Rect(64, 18, 1, 96));
+                        ui::Context::lcd_ptr->SetRegion(libsc::Lcd::Rect(image_w >> 1, 18, 1, image_h));
                         ui::Context::lcd_ptr->FillColor(ui::Context::color_scheme.PRIMARY);
                     }
                 }
@@ -179,8 +203,6 @@ void CameraMenu::run() {
 
     CameraPreviewAction camera_preview_action;
 
-    int i = 0;
-
     libsc::Servo* servo_ptr = new libsc::Servo([](){
         libsc::Servo::Config servo_config {};
         servo_config.id = 0;
@@ -190,16 +212,19 @@ void CameraMenu::run() {
         return servo_config;
     }());
 
+    int servo_integer_test_angle = 0;
+
     class ServoInteger: public ui::MenuNumber<int> {
     public:
         explicit ServoInteger(int* i_ptr, libsc::Servo* servo_ptr): i_ptr(i_ptr), servo_ptr(servo_ptr) {}
 
         void onEnter() override {
-            this->value = *i_ptr;
+            setValue(*i_ptr);
         }
 
         void onChange() override {
             servo_ptr->SetDegree((uint16_t) (900 + value));
+            *i_ptr = value;
         }
 
     private:
@@ -207,10 +232,15 @@ void CameraMenu::run() {
         libsc::Servo* servo_ptr;
     };
 
-    ServoInteger servo_integer(&i, servo_ptr);
+    ServoInteger servo_integer(&servo_integer_test_angle, servo_ptr);
     servo_integer.setName("Turn Servo");
-    servo_integer.setValue(i);
+    servo_integer.setValue(0);
     servo_integer.setStep(5);
+
+
+    //
+    // Add items to menu_group
+    //
 
     menu_group.addMenuAction(&run_action);
     menu_group.addMenuAction(&servo_integer);
@@ -219,7 +249,19 @@ void CameraMenu::run() {
     menu_group.addMenuAction(&config_d);
     menu_group.addMenuAction(&camera_preview_action);
     menu_group.addMenuAction(&reset_flash_action);
+
+
+    //
+    // Enter menu and its render loop.
+    // The code will continue when the user hits the "Run" option, which exits the menu.
+    //
+
     menu_group.run();
+
+
+    //
+    // Clean removal of fonts to save memory
+    //
 
     ui::Context::removeFontFromRepo("Humanist");
     ui::Context::removeFontFromRepo("Blocky");
